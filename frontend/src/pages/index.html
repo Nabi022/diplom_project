@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartText | Конспектер текста</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #6b73ff 0%, #000dff 100%);
+        }
+        .text-gradient {
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .loading {
+            display: none;
+        }
+        .loading.active {
+            display: flex;
+        }
+        .textarea-style {
+            transition: all 0.3s ease;
+            background-color: #f8fafc;
+        }
+        .textarea-style:focus {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        .result-box {
+            background-color: #f8fafc;
+            min-height: 256px;
+        }
+        .btn-hover:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Шапка -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fas fa-file-alt text-2xl"></i>
+                <h1 class="text-xl font-bold">SmartText</h1>
+            </div>
+            <a href="#" class="px-4 py-2 bg-white text-blue-600 rounded-full font-medium hover:bg-gray-100 transition btn-hover">
+                <i class="fas fa-home mr-2"></i>На главную
+            </a>
+        </div>
+    </header>
+
+    <!-- Основной контент -->
+    <main class="container mx-auto px-4 py-8 max-w-6xl">
+        <div class="text-center mb-10">
+            <h2 class="text-3xl font-bold text-gray-800 mb-2">Конспектер текста</h2>
+            <p class="text-gray-600 max-w-2xl mx-auto">Вставьте текст, и наш алгоритм создаст краткий конспект, сохраняя ключевые мысли</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div class="grid md:grid-cols-2 gap-0">
+                <!-- Исходный текст -->
+                <div class="p-6 border-r border-gray-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                            <i class="fas fa-pencil-alt mr-2 text-blue-500"></i>Исходный текст
+                        </h3>
+                        <div class="text-sm text-gray-500" id="charCount">0 символов</div>
+                    </div>
+                    <textarea id="sourceText" class="textarea-style w-full h-64 p-4 border rounded-lg focus:outline-none" 
+                              placeholder="Вставьте сюда текст для конспектирования..."></textarea>
+                    <div class="mt-4 flex justify-between">
+                        <button id="clearBtn" class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition btn-hover">
+                            <i class="fas fa-trash-alt mr-2"></i>Очистить
+                        </button>
+                        <button id="summarizeBtn" class="px-5 py-2.5 gradient-bg text-white rounded-lg font-medium hover:opacity-90 transition btn-hover">
+                            <i class="fas fa-magic mr-2"></i>Создать конспект
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Результат -->
+                <div class="p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                            <i class="fas fa-file-contract mr-2 text-purple-500"></i>Конспект
+                        </h3>
+                        <div class="text-sm text-gray-500" id="resultCount">0 символов</div>
+                    </div>
+                    <div class="loading items-center justify-center mb-4 text-blue-600 space-x-2">
+                        <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Обрабатываем ваш текст...</span>
+                    </div>
+                    <div id="result" class="result-box w-full p-4 border rounded-lg overflow-auto"></div>
+                    <div class="mt-4 flex justify-end">
+                        <button id="copyBtn" class="px-5 py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition btn-hover">
+                            <i class="fas fa-copy mr-2"></i>Копировать
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Информационный блок -->
+        <div class="mt-12 bg-blue-50 rounded-xl p-6 border border-blue-100">
+            <h3 class="text-xl font-semibold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-info-circle mr-2 text-blue-500"></i>Как это работает?
+            </h3>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-white p-4 rounded-lg shadow-sm">
+                    <div class="text-blue-500 mb-2 text-2xl"><i class="fas fa-upload"></i></div>
+                    <h4 class="font-medium mb-1">1. Вставьте текст</h4>
+                    <p class="text-gray-600 text-sm">Вставьте любой текст, который нужно сократить: статья, лекция, документ.</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-sm">
+                    <div class="text-blue-500 mb-2 text-2xl"><i class="fas fa-cogs"></i></div>
+                    <h4 class="font-medium mb-1">2. Обработка</h4>
+                    <p class="text-gray-600 text-sm">Наш алгоритм анализирует текст и выделяет ключевые моменты.</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-sm">
+                    <div class="text-blue-500 mb-2 text-2xl"><i class="fas fa-file-download"></i></div>
+                    <h4 class="font-medium mb-1">3. Получите результат</h4>
+                    <p class="text-gray-600 text-sm">Скачайте или скопируйте готовый конспект в удобном формате.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Подвал -->
+    <footer class="bg-gray-800 text-white mt-12">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-file-alt text-2xl"></i>
+                        <span class="font-bold">SmartText</span>
+                    </div>
+                    <p class="text-gray-400 text-sm mt-1">Умное сокращение текстов с 2023 года</p>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="#" class="text-gray-300 hover:text-white"><i class="fab fa-telegram"></i></a>
+                    <a href="#" class="text-gray-300 hover:text-white"><i class="fab fa-vk"></i></a>
+                    <a href="#" class="text-gray-300 hover:text-white"><i class="fab fa-github"></i></a>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 mt-6 pt-6 text-center text-gray-400 text-sm">
+                © 2023 SmartText. Все права защищены.
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sourceText = document.getElementById('sourceText');
+            const result = document.getElementById('result');
+            const summarizeBtn = document.getElementById('summarizeBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const copyBtn = document.getElementById('copyBtn');
+            const loading = document.querySelector('.loading');
+            const charCount = document.getElementById('charCount');
+            const resultCount = document.getElementById('resultCount');
+            
+            // Счетчик символов
+            sourceText.addEventListener('input', function() {
+                const count = sourceText.value.length;
+                charCount.textContent = `${count} ${getNoun(count, 'символ', 'символа', 'символов')}`;
+            });
+            
+            // Функция для склонения слов
+            function getNoun(number, one, two, five) {
+                let n = Math.abs(number);
+                n %= 100;
+                if (n >= 5 && n <= 20) return five;
+                n %= 10;
+                if (n === 1) return one;
+                if (n >= 2 && n <= 4) return two;
+                return five;
+            }
+            
+            // Упрощение текста (улучшенный алгоритм)
+            function summarizeText(text) {
+                // Разбиваем текст на абзацы
+                const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+                
+                let summary = [];
+                
+                paragraphs.forEach(paragraph => {
+                    // Разбиваем абзац на предложения
+                    const sentences = paragraph.split(/[.!?]+/).filter(s => s.trim().length > 0);
+                    
+                    if (sentences.length > 0) {
+                        // Добавляем первое предложение (обычно это тезис абзаца)
+                        summary.push(sentences[0].trim());
+                        
+                        // Если абзац длинный, добавляем еще одно ключевое предложение
+                        if (sentences.length > 3) {
+                            const midIndex = Math.floor(sentences.length / 2);
+                            summary.push(sentences[midIndex].trim());
+                        }
+                    }
+                });
+                
+                // Ограничиваем размер конспекта (30% от оригинала)
+                const maxLength = Math.floor(text.length * 0.3);
+                let finalSummary = [];
+                let currentLength = 0;
+                
+                for (const sentence of summary) {
+                    if (currentLength + sentence.length <= maxLength) {
+                        finalSummary.push(sentence);
+                        currentLength += sentence.length;
+                    } else {
+                        break;
+                    }
+                }
+                
+                return finalSummary.join('. ') + (finalSummary.length > 0 ? '.' : '');
+            }
+            
+            // Обработка нажатия кнопки "Создать конспект"
+            summarizeBtn.addEventListener('click', function() {
+                const text = sourceText.value.trim();
+                if (!text) {
+                    showAlert('Пожалуйста, введите текст для конспектирования', 'error');
+                    return;
+                }
+                
+                loading.classList.add('active');
+                result.textContent = '';
+                
+                // Имитация обработки (в реальности можно использовать API)
+                setTimeout(() => {
+                    const summary = summarizeText(text);
+                    result.innerHTML = formatSummary(summary);
+                    resultCount.textContent = `${summary.length} ${getNoun(summary.length, 'символ', 'символа', 'символов')}`;
+                    loading.classList.remove('active');
+                    showAlert('Конспект успешно создан!', 'success');
+                }, 1500);
+            });
+            
+            // Форматирование результата
+            function formatSummary(text) {
+                if (!text) return '<p class="text-gray-500 italic">Здесь появится ваш конспект</p>';
+                
+                // Добавляем жирный шрифт к первым словам предложений
+                return text.split('. ').map(sentence => {
+                    const firstSpace = sentence.indexOf(' ');
+                    if (firstSpace > 0) {
+                        const firstWord = sentence.substring(0, firstSpace);
+                        const rest = sentence.substring(firstSpace);
+                        return `<strong>${firstWord}</strong>${rest}`;
+                    }
+                    return sentence;
+                }).join('. ');
+            }
+            
+            // Очистка полей
+            clearBtn.addEventListener('click', function() {
+                sourceText.value = '';
+                result.textContent = '';
+                charCount.textContent = '0 символов';
+                resultCount.textContent = '0 символов';
+            });
+            
+            // Копирование результата
+            copyBtn.addEventListener('click', function() {
+                if (!result.textContent.trim()) {
+                    showAlert('Нет текста для копирования', 'error');
+                    return;
+                }
+                
+                navigator.clipboard.writeText(result.textContent)
+                    .then(() => showAlert('Конспект скопирован в буфер обмена!', 'success'))
+                    .catch(err => {
+                        console.error('Ошибка копирования:', err);
+                        showAlert('Не удалось скопировать текст', 'error');
+                    });
+            });
+            
+            // Показ уведомлений
+            function showAlert(message, type) {
+                const alert = document.createElement('div');
+                alert.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white font-medium ${
+                    type === 'success' ? 'bg-green-500' : 'bg-red-500'
+                }`;
+                alert.innerHTML = `
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'} mr-2"></i>
+                    ${message}
+                `;
+                document.body.appendChild(alert);
+                
+                setTimeout(() => {
+                    alert.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                    setTimeout(() => alert.remove(), 300);
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>
