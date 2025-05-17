@@ -262,7 +262,7 @@ const AboutPage = () => {
     </div>
   </div>
 </section>
-<section className="bg-gradient-to-r from-blue-400 via-blue-500 to-purple-500 text-white text-center px-6 py-16 mt-16 rounded-3xl shadow-lg max-w-7xl mx-auto">
+<section className="bg-gradient-to-r from-blue-400 via-blue-500 to-purple-500 text-white text-center px-6 py-16 mt-16 mb-32 rounded-3xl shadow-lg max-w-7xl mx-auto">
   <h2 className="text-3xl md:text-4xl font-bold mb-4">Готовы попробовать?</h2>
   <p className="text-lg mb-8 max-w-2xl mx-auto">
     Начните использовать SmartLectures уже сегодня и измените свой подход к обучению!
@@ -273,32 +273,32 @@ const AboutPage = () => {
 </section>
 
 
-<footer id="contacts" className="bg-white text-purple-600 py-12">
+<footer id="contacts" className="bg-gradient-to-r from-purple-500 via-indigo-500 to-blue-500 text-white py-12">
   <div className="container mx-auto px-6">
     <div className="flex flex-col md:flex-row justify-between">
       <div className="mb-8 md:mb-0">
         <div className="flex items-center space-x-2 mb-4">
-          <i className="fas fa-graduation-cap text-2xl"></i>
-          <span className="text-xl font-bold">SmartLectures</span>
+          <i className="fas fa-graduation-cap text-2xl text-white"></i>
+          <span className="text-xl font-bold text-white">SmartLectures</span>
         </div>
-        <p className="max-w-xs opacity-90">
+        <p className="max-w-xs opacity-90 text-white">
           Платформа для автоматического создания учебных материалов.
         </p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-2 gap-8">
         <div>
-          <h3 className="text-lg font-semibold mb-4">Навигация</h3>
+          <h3 className="text-lg font-semibold mb-4 text-white">Навигация</h3>
           <ul className="space-y-2">
-            <li><a href="/" className="hover:text-gray-300 transition">Главная</a></li>
-            <li><a href="/#features" className="hover:text-gray-300 transition">Функции</a></li>
-            <li><a href="/about" className="hover:text-gray-300 transition">О нас</a></li>
+            <li><a href="/" className="hover:text-gray-200 transition">Главная</a></li>
+            <li><a href="/#features" className="hover:text-gray-200 transition">Функции</a></li>
+            <li><a href="/about" className="hover:text-gray-200 transition">О нас</a></li>
           </ul>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold mb-4">Контакты</h3>
-          <ul className="space-y-2">
+          <h3 className="text-lg font-semibold mb-4 text-white">Контакты</h3>
+          <ul className="space-y-2 text-white">
             <li className="flex items-center space-x-2">
               <i className="fas fa-envelope"></i>
               <span>nabiumarov02@gmail.com</span>

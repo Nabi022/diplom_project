@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 const RegisterPage = () => {
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState(""); // <--- новое поле
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
@@ -17,17 +18,17 @@ const RegisterPage = () => {
     }
 
     try {
-      const response = await fetch("http://localhost:8000/api/register/", {
+      const response = await fetch("http://127.0.0.1:8000/api/register/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, email, password }), // <-- добавлен email
       });
 
       if (response.ok) {
         navigate("/login");
       } else {
         const err = await response.json();
-        setError(err.username?.[0] || "Ошибка регистрации");
+        setError(err.username || err.email || "Ошибка регистрации");
       }
     } catch {
       setError("Ошибка подключения к серверу");
@@ -37,7 +38,7 @@ const RegisterPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="w-full max-w-6xl bg-white rounded-xl shadow-lg overflow-hidden grid grid-cols-1 md:grid-cols-2">
-        {/* Левая часть — описание */}
+        {/* Левая часть */}
         <div className="hidden md:flex flex-col justify-center p-10 bg-gradient-to-br from-indigo-600 via-purple-600 to-purple-700 text-white">
           <h2 className="text-3xl font-bold mb-6">SmartLectures</h2>
           <h3 className="text-2xl font-semibold mb-4">Присоединяйтесь к нам</h3>
@@ -46,7 +47,7 @@ const RegisterPage = () => {
           </p>
         </div>
 
-        {/* Правая часть — форма регистрации */}
+        {/* Правая часть */}
         <div className="p-8 sm:p-10">
           <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">Регистрация</h2>
           <form onSubmit={handleRegister} className="space-y-5">
@@ -56,6 +57,17 @@ const RegisterPage = () => {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-gray-600 text-sm mb-1">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:outline-none"
               />

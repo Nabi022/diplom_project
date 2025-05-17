@@ -6,9 +6,11 @@ from .views import (
     generate_questions,
     generate_quiz,
     user_profile,
+    register_user, 
 )
 
 urlpatterns = [
+    path('register/', register_user, name='register'), 
     path('summarize/', summarize_lecture, name='summarize'),
     path('questions/', generate_questions, name='questions'),
     path('quiz/', generate_quiz, name='quiz'),

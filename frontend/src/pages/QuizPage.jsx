@@ -12,9 +12,13 @@ const QuestionsPage = () => {
   const [stage, setStage] = useState("upload");
   const fileInputRef = useRef(null);
   const dropRef = useRef(null);
+  const [title, setTitle] = useState("");
+
 
   useEffect(() => {
     const dropArea = dropRef.current;
+    if (!dropArea) return;
+
     const handleDragOver = (e) => {
       e.preventDefault();
       dropArea.classList.add("active");
@@ -39,32 +43,50 @@ const QuestionsPage = () => {
   }, []);
 
   const handleGenerate = async () => {
-    if (!file && !text.trim()) {
-      alert("Пожалуйста, загрузите файл или введите текст лекции");
-      return;
-    }
+  if (!file && !text.trim()) {
+    alert("Пожалуйста, загрузите файл или введите текст лекции");
+    return;
+  }
 
-    setStage("loading");
-    setProgress(30);
+  setStage("loading");
+  setProgress(30);
 
-    try {
-      const response = await authFetch("http://127.0.0.1:8000/api/questions/", {
-        method: "POST",
-        body: JSON.stringify({ text, count: questionCount }),
-      });
+  try {
+    // Сначала создаём лекцию
+    const summarizeRes = await authFetch("http://127.0.0.1:8000/api/summarize/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text, title }),
+});
 
-      if (!response.ok) throw new Error("Ошибка при генерации вопросов");
+    if (!summarizeRes.ok) throw new Error("Ошибка при создании лекции");
+    const lecture = await summarizeRes.json();
+    setProgress(60);
 
-      const data = await response.json();
-      setQuestions(data);
-      setProgress(100);
-      setTimeout(() => setStage("results"), 300);
-    } catch (error) {
-      console.error("Ошибка при генерации вопросов:", error);
-      alert("Ошибка при генерации вопросов");
-      setStage("upload");
-    }
-  };
+    // Затем отправляем запрос на генерацию вопросов с lecture_id
+    const response = await authFetch("http://127.0.0.1:8000/api/questions/", {
+      method: "POST",
+      body: JSON.stringify({
+        text,
+        count: questionCount,
+        lecture_id: lecture.id,
+      }),
+    });
+
+    if (!response.ok) throw new Error("Ошибка при генерации вопросов");
+
+    const data = await response.json();
+    setQuestions(data);
+    setProgress(100);
+    setTimeout(() => setStage("results"), 300);
+  } catch (error) {
+    console.error("Ошибка при генерации вопросов:", error);
+    alert("Ошибка при генерации вопросов");
+    setStage("upload");
+  }
+};
 
   const handleNew = () => {
     setFile(null);
@@ -77,9 +99,10 @@ const QuestionsPage = () => {
 
   return (
     <AnimatedPage>
-      <div className="bg-gray-50 min-h-screen pt-0">
-        <Header color="green" />
-        <div className="max-w-6xl mx-auto mt-16 text-center animate-fade-in font-sans px-4">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-green-100 to-white pt-[100px] text-sm">
+        <Header color="green" styleType="fixed" />
+        <div className="max-w-6xl mx-auto mt-16 text-center animate-fade-in font-sans px-4 pb-16">
+          <div className="pt-[10px]"></div>
           <h1 className="text-4xl font-bold text-gray-800 mb-2 tracking-normal leading-snug">
             Генерация контрольных вопросов
           </h1>
@@ -111,12 +134,7 @@ const QuestionsPage = () => {
           </div>
 
           <div className="bg-white p-8 rounded-xl shadow-md max-w-6xl mx-auto mb-16">
-            <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">Генерация вопросов</h1>
-            <p className="text-gray-500 text-center mb-8">
-              Загрузите материалы лекции и получите автоматически сгенерированные вопросы
-            </p>
-
-            {stage === "loading" && (
+                        {stage === "loading" && (
               <div className="bg-white rounded-xl shadow-lg p-8 mb-8 text-center">
                 <i className="fas fa-cog fa-spin text-4xl text-green-600 mb-4"></i>
                 <h2 className="text-2xl font-semibold text-gray-800 mb-2">Генерация вопросов</h2>
@@ -132,6 +150,13 @@ const QuestionsPage = () => {
 
             <div className="flex flex-col md:flex-row gap-6 mb-6">
               <div className="flex-1">
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full mb-4 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  placeholder="Введите название лекции"
+                />
                 <textarea
                   value={text}
                   onChange={(e) => setText(e.target.value)}
@@ -143,7 +168,7 @@ const QuestionsPage = () => {
               <div
                 ref={dropRef}
                 className="flex-1 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-green-400 transition-colors"
-                onClick={() => fileInputRef.current.click()}
+                onClick={() => fileInputRef.current?.click()}
               >
                 {file ? (
                   <div>
@@ -166,6 +191,7 @@ const QuestionsPage = () => {
                 />
               </div>
             </div>
+
 
             <div className="flex flex-col items-center gap-4">
               <label className="text-gray-700 font-medium mb-1 text-center">Количество вопросов:</label>
@@ -199,7 +225,7 @@ const QuestionsPage = () => {
                 {questions.map((q, i) => (
                   <div key={i} className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                     <p className="text-gray-800 text-lg">
-                      {i + 1}. {typeof q === "object" && q.question ? q.question : "Вопрос не найден."}
+                      {i + 1}. {typeof q === "object" && q.question_text ? q.question_text : "Вопрос не найден."}
                     </p>
                   </div>
                 ))}
