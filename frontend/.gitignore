@@ -39,3 +39,13 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+.env
+.DS_Store
+/media/
