@@ -59,12 +59,13 @@ const LecturePage = () => {
       const data = await res.json();
 
       if (res.ok) {
-        setSummary(data.summary);
+        setSummary(data.summary_text);
         setSummaryCharCount(
-          Array.isArray(data.summary)
-            ? data.summary.join(" ").length
-            : data.summary.length
+          Array.isArray(data.summary_text)
+            ? data.summary_text.join(" ").length
+            : data.summary_text.length
         );
+
       } else {
         alert(data.error || "Произошла ошибка");
       }
@@ -94,6 +95,36 @@ const LecturePage = () => {
       .then(() => alert("Конспект скопирован!"))
       .catch(() => alert("Ошибка копирования"));
   };
+
+  const handleSaveLecture = async () => {
+  if (!title.trim() || !text.trim() || !summary.trim()) {
+    alert("Заполните все поля и сгенерируйте конспект перед сохранением");
+    return;
+  }
+
+  try {
+    const res = await authFetch("http://127.0.0.1:8000/api/save_lecture/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        text,
+        summary,
+        format: useBullets ? "тезисы" : "абзац"
+      }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      alert("Лекция успешно сохранена");
+    } else {
+      alert(data.error || "Ошибка при сохранении лекции");
+    }
+  } catch (err) {
+    alert("Сервер не отвечает");
+  }
+};
 
   return (
     <AnimatedPage>
@@ -259,12 +290,18 @@ const LecturePage = () => {
                 )}
               </div>
 
-              <div className="mt-4 flex justify-end">
+              <div className="mt-4 flex justify-end gap-4">
                 <button
                   onClick={handleCopy}
                   className="px-5 py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition"
                 >
                   <i className="fas fa-copy mr-2"></i>Копировать
+                </button>
+                <button
+                  onClick={handleSaveLecture}
+                  className="px-5 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition"
+                >
+                  <i className="fas fa-save mr-2"></i>Сохранить в БД
                 </button>
               </div>
             </div>

@@ -61,12 +61,16 @@ const TestPage = () => {
 
       if (!summarizeRes.ok) throw new Error("Ошибка при создании лекции");
       const lecture = await summarizeRes.json();
-      setProgress(60);
+      const lectureId = lecture.lecture.id;
 
       const quizRes = await authFetch("http://127.0.0.1:8000/api/quiz/", {
         method: "POST",
-        body: JSON.stringify({ lecture_id: lecture.id, count }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text, count }),
       });
+
 
       if (!quizRes.ok) throw new Error("Ошибка при генерации теста");
 

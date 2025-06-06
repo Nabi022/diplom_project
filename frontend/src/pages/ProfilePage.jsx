@@ -92,7 +92,7 @@ const ProfilePage = () => {
   return (
     <AnimatedPage>
   <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-200 to-white text-sm">
-    <Header color="bluepurple" styleType = "floating" />
+    <Header color="bluepurple" styleType = "floating" onLogout={handleLogout} />
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-6">
       <div className="pt-[100px]"></div>
 

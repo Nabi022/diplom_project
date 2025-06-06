@@ -71,7 +71,7 @@ const QuestionsPage = () => {
       body: JSON.stringify({
         text,
         count: questionCount,
-        lecture_id: lecture.id,
+        lecture_id: lecture.lecture.id,
       }),
     });
 

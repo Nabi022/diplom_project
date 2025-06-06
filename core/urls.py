@@ -1,4 +1,3 @@
-# core/urls.py
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.urls import path
 from .views import (
@@ -6,7 +5,8 @@ from .views import (
     generate_questions,
     generate_quiz,
     user_profile,
-    register_user, 
+    register_user,
+    save_lecture,  # <--- здесь импорт
 )
 
 urlpatterns = [
@@ -17,4 +17,5 @@ urlpatterns = [
     path('profile/', user_profile, name='profile'),
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path("save_lecture/", save_lecture, name="save_lecture"),  # без 'api/'
 ]
