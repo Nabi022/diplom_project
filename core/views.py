@@ -2,45 +2,21 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, T5ForConditionalGeneration, pipeline
 import torch
 import random
 import re
-from .models import Lecture
+from .models import Lecture, Summary
 from .serializers import LectureSerializer, QuestionSerializer, QuizSerializer, UserSerializer
 from django.contrib.auth import get_user_model
-from .models import Summary
 from django.views.decorators.csrf import csrf_exempt
-import traceback
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# Модели
-paraphraser_name = "cointegrated/rut5-base-paraphraser"
-paraphraser_tokenizer = AutoTokenizer.from_pretrained(paraphraser_name, use_fast=False)
-paraphraser_model = AutoModelForSeq2SeqLM.from_pretrained(paraphraser_name).to(device)
-
-sum_model_name = "cointegrated/rut5-base-absum"
-sum_tokenizer = AutoTokenizer.from_pretrained(sum_model_name)
-sum_model = AutoModelForSeq2SeqLM.from_pretrained(sum_model_name).to(device)
-
-# Для генерации вопросов
-questions_model_name = "hivaze/AAQG-QA-QG-FRED-T5-1.7B"
-qg_tokenizer = AutoTokenizer.from_pretrained(questions_model_name)
-qg_model = T5ForConditionalGeneration.from_pretrained(questions_model_name).to(device)
-
-# Для генерации тестов
-question_tokenizer = AutoTokenizer.from_pretrained("hivaze/AAQG-QA-QG-FRED-T5-1.7B")
-question_model = T5ForConditionalGeneration.from_pretrained("hivaze/AAQG-QA-QG-FRED-T5-1.7B").to(device)
-
-# Ответы к вопросам
-qa_pipeline = pipeline(
-    "question-answering",
-    model="AlexKay/xlm-roberta-large-qa-multilingual-finedtuned-ru",
-    tokenizer="AlexKay/xlm-roberta-large-qa-multilingual-finedtuned-ru",
-    device=0 if torch.cuda.is_available() else -1
+from .models_loader import (
+    load_paraphraser,
+    load_summarizer,
+    load_question_generator,
+    load_qa_pipeline,
 )
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 User = get_user_model()
 
 @api_view(["GET", "PATCH"])
@@ -92,6 +68,7 @@ def update_profile(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 def paraphrase(text):
+    paraphraser_tokenizer, paraphraser_model = load_paraphraser()
     prompt = f"paraphrase: {text}"
     input_ids = paraphraser_tokenizer.encode(prompt, return_tensors="pt", max_length=256, truncation=True).to(device)
     output_ids = paraphraser_model.generate(input_ids, max_length=256, num_beams=5,
@@ -131,7 +108,8 @@ def summarize_lecture(request):
         return Response({"error": "Текст не предоставлен"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        summary = summarize_long_text_by_parts(text, sum_tokenizer, sum_model, device, level)
+        tokenizer, model = load_summarizer()
+        summary = summarize_long_text_by_parts(text, tokenizer, model, device, level)
         return Response({
             "lecture": {
                 "title": title,
@@ -145,6 +123,7 @@ def summarize_lecture(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def generate_questions(request):
+    tokenizer, model = load_question_generator()
     text = request.data.get("text", "")
     count = int(request.data.get("count", 3))
 
@@ -153,39 +132,37 @@ def generate_questions(request):
 
     try:
         prompt = f"Сгенерируй вопрос по тексту. Текст: '{text}'"
-        input_ids = qg_tokenizer.encode(prompt, return_tensors="pt", truncation=True, max_length=512).to(device)
-        output_ids = qg_model.generate(input_ids=input_ids, max_length=128, num_beams=5,
-                                       num_return_sequences=count, early_stopping=True,
-                                       no_repeat_ngram_size=2)
+        input_ids = tokenizer.encode(prompt, return_tensors="pt", truncation=True, max_length=512).to(device)
+        output_ids = model.generate(input_ids=input_ids, max_length=128, num_beams=5,
+                                    num_return_sequences=count, early_stopping=True,
+                                    no_repeat_ngram_size=2)
 
-        questions = [qg_tokenizer.decode(out, skip_special_tokens=True).strip()
-                     for out in output_ids if qg_tokenizer.decode(out, skip_special_tokens=True).strip()]
+        questions = [tokenizer.decode(out, skip_special_tokens=True).strip()
+                     for out in output_ids if tokenizer.decode(out, skip_special_tokens=True).strip()]
 
         return Response([{"question_text": q} for q in questions], status=status.HTTP_200_OK)
 
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-from django.views.decorators.csrf import csrf_exempt
-
-
 @csrf_exempt
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def generate_quiz(request):
     try:
+        tokenizer, model = load_question_generator()
+        qa_pipeline = load_qa_pipeline()
+
         text = request.data.get("text", "")
         count = int(request.data.get("count", 3))
 
         if not text.strip():
             return Response({"error": "Текст не предоставлен"}, status=400)
 
-        # 1. Генерация вопросов
         input_text = f"generate questions: {text[:3000]}"
-        input_ids = question_tokenizer.encode(input_text, return_tensors="pt", max_length=1024, truncation=True).to(device)
+        input_ids = tokenizer.encode(input_text, return_tensors="pt", max_length=1024, truncation=True).to(device)
 
-        output_ids = question_model.generate(
+        output_ids = model.generate(
             input_ids=input_ids,
             max_length=128,
             num_beams=5,
@@ -194,7 +171,7 @@ def generate_quiz(request):
         )
 
         questions = [
-            question_tokenizer.decode(out, skip_special_tokens=True).strip()
+            tokenizer.decode(out, skip_special_tokens=True).strip()
             for out in output_ids
         ]
 
@@ -202,14 +179,12 @@ def generate_quiz(request):
 
         for q in questions:
             try:
-                # 2. Получение ответа к вопросу
                 answer_result = qa_pipeline(question=q, context=text)
                 correct = answer_result['answer'].strip()
 
                 if not correct or len(correct) < 2:
                     continue
 
-                # 3. Заглушки — фейковые варианты
                 fake_pool = [
                     "Операционная система", "Локальная сеть", "Bluetooth", "Флешка",
                     "Видеокарта", "Приложение", "Клавиатура", "Сканер"
@@ -234,7 +209,6 @@ def generate_quiz(request):
 
     except Exception as e:
         return Response({"error": str(e)}, status=500)
-
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -263,4 +237,3 @@ def save_lecture(request):
         return Response({"message": "Лекция успешно сохранена"}, status=201)
     except Exception as e:
         return Response({"error": str(e)}, status=500)
-
