@@ -2,9 +2,17 @@ services:
   - type: web
     name: smartlectures-backend
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn backend.wsgi:application
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: backend.settings
+      - key: PYTHON_VERSION
+        value: 3.10
+      - key: DEBUG
+        value: False
+      - key: ALLOWED_HOSTS
+        value: smartlectures-backend.onrender.com
+      - key: SECRET_KEY
+        value: your-secret-key  # обязательно замени!
     autoDeploy: true
