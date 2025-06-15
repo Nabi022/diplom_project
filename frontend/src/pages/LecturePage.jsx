@@ -148,13 +148,7 @@ const LecturePage = () => {
               <span className="tracking-tight">SmartLectures</span>
             </div>
 
-          <button
-            onClick={() => navigate("/")}
-            className="text-sm font-medium text-blue-600 hover:text-white bg-white/50 hover:bg-blue-500 border border-blue-100 rounded-xl px-4 py-1.5 shadow backdrop-blur-sm transition"
-          >
-            <i className="fas fa-arrow-left text-blue-500"></i>
-            На главную
-        </button>
+          что
         </div>
         
         <div className="bg-white/80 backdrop-blur-md p-8 rounded-3xl shadow-2xl border border-white">
