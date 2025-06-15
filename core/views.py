@@ -13,12 +13,6 @@ from .models import Lecture, Summary
 from .serializers import LectureSerializer, QuestionSerializer, QuizSerializer, UserSerializer
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
-from .models_loader import (
-    load_paraphraser,
-    load_summarizer,
-    load_question_generator,
-    load_qa_pipeline,
-)
 
 load_dotenv()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
