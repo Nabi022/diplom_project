@@ -5,6 +5,10 @@ from rest_framework import status
 import torch
 import random
 import re
+import os
+from openai import OpenAI
+from dotenv import load_dotenv
+
 from .models import Lecture, Summary
 from .serializers import LectureSerializer, QuestionSerializer, QuizSerializer, UserSerializer
 from django.contrib.auth import get_user_model
@@ -16,6 +20,7 @@ from .models_loader import (
     load_qa_pipeline,
 )
 
+load_dotenv()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 User = get_user_model()
 
@@ -58,155 +63,123 @@ def register_user(request):
     user = User.objects.create_user(username=username, password=password, email=email)
     return Response({'message': 'Пользователь успешно зарегистрирован'}, status=status.HTTP_201_CREATED)
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def update_profile(request):
-    serializer = UserSerializer(request.user, data=request.data, partial=True)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+# GPT-клиент
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def paraphrase(text):
-    paraphraser_tokenizer, paraphraser_model = load_paraphraser()
-    prompt = f"paraphrase: {text}"
-    input_ids = paraphraser_tokenizer.encode(prompt, return_tensors="pt", max_length=256, truncation=True).to(device)
-    output_ids = paraphraser_model.generate(input_ids, max_length=256, num_beams=5,
-                                            no_repeat_ngram_size=3, repetition_penalty=1.5,
-                                            temperature=0.9, early_stopping=True)
-    result = paraphraser_tokenizer.decode(output_ids[0], skip_special_tokens=True)
-    return re.sub(r'^(Комментарий|Параграф|Описание|Пример|Например|Следовательно|В целом)[:,]?\s+', '', result, flags=re.IGNORECASE)
-
-def summarize_long_text_by_parts(full_text, tokenizer, model, device, level="medium"):
-    max_len, min_len = {"short": (180, 40), "long": (350, 120)}.get(level, (250, 80))
-    paragraphs = [p.strip() for p in full_text.split('\n') if p.strip()]
-    bullet_points = []
-
-    for paragraph in paragraphs:
-        prompt = f"summarize: {paragraph}"
-        input_ids = tokenizer.encode(prompt, return_tensors="pt", max_length=1024, truncation=True).to(device)
-        output_ids = model.generate(input_ids=input_ids, max_length=max_len, min_length=min_len,
-                                    num_beams=5, no_repeat_ngram_size=3, early_stopping=True)
-        summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-        for s in re.split(r'(?<=[.!?])\s+', summary.strip()):
-            if not s.strip(): continue
-            try: paraphrased = paraphrase(s.strip())
-            except: paraphrased = s.strip()
-            bullet = f"• {paraphrased[0].upper() + paraphrased[1:]}" if paraphrased and paraphrased[0].islower() else f"• {paraphrased}"
-            bullet_points.append(bullet)
-
-    return "\n".join(bullet_points)
+def ask_gpt(prompt, max_tokens=1500):
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=max_tokens,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        raise Exception(f"GPT ошибка: {str(e)}")
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def summarize_lecture(request):
+def summarize_lecture_gpt(request):
     text = request.data.get("text", "")
-    level = request.data.get("level", "medium")
-    title = request.data.get("title", "").strip() or "Без названия"
+    title = request.data.get("title", "Без названия")
+    level = request.data.get("level", "medium")  # short, medium, long
+    format_type = request.data.get("format", "paragraph")  # "thesis" или "paragraph"
 
     if not text.strip():
-        return Response({"error": "Текст не предоставлен"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Текст не предоставлен"}, status=400)
 
-    try:
-        tokenizer, model = load_summarizer()
-        summary = summarize_long_text_by_parts(text, tokenizer, model, device, level)
-        return Response({
-            "lecture": {
-                "title": title,
-                "content": text
-            },
-            "summary_text": summary
-        }, status=status.HTTP_200_OK)
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    level_prompts = {
+        "short": "очень краткий, сжато выдели только главное",
+        "medium": "краткий, но с сохранением основной структуры",
+        "long": "подробный, максимально раскрывающий содержание",
+    }
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def generate_questions(request):
-    tokenizer, model = load_question_generator()
-    text = request.data.get("text", "")
-    count = int(request.data.get("count", 3))
-
-    if not text.strip():
-        return Response({"error": "Текст не предоставлен."}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        prompt = f"Сгенерируй вопрос по тексту. Текст: '{text}'"
-        input_ids = tokenizer.encode(prompt, return_tensors="pt", truncation=True, max_length=512).to(device)
-        output_ids = model.generate(input_ids=input_ids, max_length=128, num_beams=5,
-                                    num_return_sequences=count, early_stopping=True,
-                                    no_repeat_ngram_size=2)
-
-        questions = [tokenizer.decode(out, skip_special_tokens=True).strip()
-                     for out in output_ids if tokenizer.decode(out, skip_special_tokens=True).strip()]
-
-        return Response([{"question_text": q} for q in questions], status=status.HTTP_200_OK)
-
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@csrf_exempt
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def generate_quiz(request):
-    try:
-        tokenizer, model = load_question_generator()
-        qa_pipeline = load_qa_pipeline()
-
-        text = request.data.get("text", "")
-        count = int(request.data.get("count", 3))
-
-        if not text.strip():
-            return Response({"error": "Текст не предоставлен"}, status=400)
-
-        input_text = f"generate questions: {text[:3000]}"
-        input_ids = tokenizer.encode(input_text, return_tensors="pt", max_length=1024, truncation=True).to(device)
-
-        output_ids = model.generate(
-            input_ids=input_ids,
-            max_length=128,
-            num_beams=5,
-            num_return_sequences=count,
-            early_stopping=True
+    if format_type == "thesis":
+        prompt = (
+            f"Сделай {level_prompts.get(level, 'краткий')} конспект текста лекции в виде списка тезисов. "
+            f"Каждый пункт начинай с маркера (•), но **не ставь точку в конце строки**. "
+            f"Излагай кратко, избегай воды и общих слов. Вот текст:\n{text}"
+        )
+    else:
+        prompt = (
+            f"Сделай {level_prompts.get(level, 'краткий')} конспект текста лекции в виде одного или нескольких абзацев. "
+            f"Фокусируйся на сути, избегай воды и общих фраз. Вот текст:\n{text}"
         )
 
-        questions = [
-            tokenizer.decode(out, skip_special_tokens=True).strip()
-            for out in output_ids
+    try:
+        summary = ask_gpt(prompt, max_tokens=1500)
+        return Response({
+            "lecture": {"title": title, "content": text},
+            "summary_text": summary
+        }, status=200)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def generate_questions_gpt(request):
+    text = request.data.get("text", "")
+    count = int(request.data.get("count", 3))
+    if not text.strip():
+        return Response({"error": "Текст не предоставлен"}, status=400)
+
+    prompt = (
+        f"Сгенерируй {count} контрольных вопросов по следующему тексту. "
+        f"Формат: только список вопросов без ответов.\n\n{text}"
+    )
+    try:
+        questions = ask_gpt(prompt)
+        question_list = [
+            q.strip("-•0123456789. ") for q in questions.split("\n")
+            if q.strip() and len(q.strip()) > 5
         ]
+        return Response([{"question_text": q} for q in question_list], status=200)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def generate_quiz_gpt(request):
+    text = request.data.get("text", "")
+    count = int(request.data.get("count", 3))
+    if not text.strip():
+        return Response({"error": "Текст не предоставлен"}, status=400)
+
+    prompt = (
+        f"Сгенерируй {count} тестовых вопросов по следующему тексту. "
+        f"У каждого вопроса должно быть 4 варианта ответа, правильный оберни в двойные звёздочки **. "
+        f"Формат:\n"
+        f"1. Вопрос?\nA) неверно\nB) **правильно**\nC) неверно\nD) неверно\n\n"
+        f"Текст:\n{text}"
+    )
+    try:
+        raw_output = ask_gpt(prompt)
         quiz = []
+        blocks = re.split(r"\n{2,}", raw_output)
 
-        for q in questions:
-            try:
-                answer_result = qa_pipeline(question=q, context=text)
-                correct = answer_result['answer'].strip()
-
-                if not correct or len(correct) < 2:
-                    continue
-
-                fake_pool = [
-                    "Операционная система", "Локальная сеть", "Bluetooth", "Флешка",
-                    "Видеокарта", "Приложение", "Клавиатура", "Сканер"
-                ]
-                distractors = random.sample([a for a in fake_pool if a.lower() != correct.lower()], 3)
-
-                options = [correct] + distractors
-                random.shuffle(options)
-                correct_index = options.index(correct)
-
-                quiz.append({
-                    "question_text": q,
-                    "options": options,
-                    "correct_index": correct_index
-                })
-
-            except Exception as e:
-                print(f"Ошибка генерации ответа: {e}")
+        for block in blocks:
+            lines = block.strip().split("\n")
+            if len(lines) < 5:
                 continue
-
+            question_line = lines[0].strip()
+            option_lines = lines[1:5]
+            options = []
+            correct_index = 0
+            for i, line in enumerate(option_lines):
+                match = re.match(r"[A-D]\)\s*(.*)", line)
+                option_raw = match.group(1).strip() if match else line.strip()
+                if "**" in option_raw and correct_index == 0:
+                    correct_index = i
+                option = re.sub(r"\*\*(.*?)\*\*", r"\1", option_raw).strip()
+                options.append(option)
+            quiz.append({
+                "question_text": question_line,
+                "options": options,
+                "correct_index": correct_index
+            })
         return Response(quiz, status=200)
-
     except Exception as e:
         return Response({"error": str(e)}, status=500)
 
@@ -222,17 +195,8 @@ def save_lecture(request):
         if not text or not summary_text:
             return Response({"error": "Данные неполные"}, status=400)
 
-        lecture = Lecture.objects.create(
-            user=request.user,
-            title=title,
-            content=text
-        )
-
-        Summary.objects.create(
-            lecture=lecture,
-            summary_text=summary_text,
-            format=format
-        )
+        lecture = Lecture.objects.create(user=request.user, title=title, content=text)
+        Summary.objects.create(lecture=lecture, summary_text=summary_text, format=format)
 
         return Response({"message": "Лекция успешно сохранена"}, status=201)
     except Exception as e:

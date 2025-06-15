@@ -2,6 +2,11 @@ export async function authFetch(url, options = {}) {
   const access = localStorage.getItem("access");
   const refresh = localStorage.getItem("refresh");
 
+  if (!access) {
+  window.location.href = "/login";
+  return;
+}
+
   if (!options.headers) options.headers = {};
   if (!(options.body instanceof FormData)) {
     options.headers["Content-Type"] = "application/json";

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { authFetch } from "../utils/authFetch";
-import Header from "../pages/Header";
+import { useNavigate } from "react-router-dom";
 import AnimatedPage from "../pages/AnimatedPage";
 
 const QuestionsPage = () => {
@@ -13,7 +13,9 @@ const QuestionsPage = () => {
   const fileInputRef = useRef(null);
   const dropRef = useRef(null);
   const [title, setTitle] = useState("");
-
+  const [summaryText, setSummaryText] = useState("");
+  const [lectureId, setLectureId] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const dropArea = dropRef.current;
@@ -43,54 +45,51 @@ const QuestionsPage = () => {
   }, []);
 
   const handleGenerate = async () => {
-  if (!file && !text.trim()) {
-    alert("Пожалуйста, загрузите файл или введите текст лекции");
-    return;
-  }
+    if (!file && !text.trim()) {
+      alert("Пожалуйста, загрузите файл или введите текст лекции");
+      return;
+    }
 
-  setStage("loading");
-  setProgress(30);
+    setStage("loading");
+    setProgress(30);
 
-  try {
-    // Сначала создаём лекцию
-    const summarizeRes = await authFetch("http://127.0.0.1:8000/api/summarize/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ text, title }),
-});
+    try {
+      const summarizeRes = await authFetch("http://127.0.0.1:8000/api/summarize-gpt/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, title }),
+      });
 
-    if (!summarizeRes.ok) throw new Error("Ошибка при создании лекции");
-    const lecture = await summarizeRes.json();
-    setProgress(60);
+      if (!summarizeRes.ok) throw new Error("Ошибка при создании лекции");
+      const lecture = await summarizeRes.json();
+      setSummaryText(lecture.summary_text);
+      setLectureId(lecture.lecture.id);
+      setProgress(60);
 
-    // Затем отправляем запрос на генерацию вопросов с lecture_id
-    const response = await authFetch("http://127.0.0.1:8000/api/questions/", {
-      method: "POST",
-      body: JSON.stringify({
-        text,
-        count: questionCount,
-        lecture_id: lecture.lecture.id,
-      }),
-    });
+      const response = await authFetch("http://127.0.0.1:8000/api/generate-questions-gpt/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, count: questionCount }),
+      });
 
-    if (!response.ok) throw new Error("Ошибка при генерации вопросов");
-
-    const data = await response.json();
-    setQuestions(data);
-    setProgress(100);
-    setTimeout(() => setStage("results"), 300);
-  } catch (error) {
-    console.error("Ошибка при генерации вопросов:", error);
-    alert("Ошибка при генерации вопросов");
-    setStage("upload");
-  }
-};
+      if (!response.ok) throw new Error("Ошибка при генерации вопросов");
+      const data = await response.json();
+      setQuestions(data);
+      setProgress(100);
+      setTimeout(() => setStage("results"), 300);
+    } catch (error) {
+      console.error("Ошибка при генерации вопросов:", error);
+      alert("Ошибка при генерации вопросов");
+      setStage("upload");
+    }
+  };
 
   const handleNew = () => {
     setFile(null);
     setText("");
+    setTitle("");
+    setSummaryText("");
+    setLectureId(null);
     setQuestionCount(5);
     setQuestions([]);
     setStage("upload");
@@ -99,57 +98,61 @@ const QuestionsPage = () => {
 
   return (
     <AnimatedPage>
-      <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-green-100 to-white pt-[100px] text-sm">
-        <Header color="green" styleType="fixed" />
-        <div className="max-w-6xl mx-auto mt-16 text-center animate-fade-in font-sans px-4 pb-16">
-          <div className="pt-[10px]"></div>
-          <h1 className="text-4xl font-bold text-gray-800 mb-2 tracking-normal leading-snug">
-            Генерация контрольных вопросов
-          </h1>
-          <p className="text-gray-600 max-w-2xl mx-auto mb-10">
-            Загрузите материалы лекции и получите автоматически сгенерированные вопросы
-          </p>
-
-          <div className="bg-green-50 rounded-xl px-6 py-6 border border-green-100 mb-10">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center justify-center">
-              <i className="fas fa-info-circle mr-2 text-green-500"></i>Как это работает?
-            </h3>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <div className="text-green-500 mb-2 text-2xl"><i className="fas fa-upload"></i></div>
-                <h4 className="font-semibold mb-1">1. Вставьте текст</h4>
-                <p className="text-gray-600 text-sm">Загрузите файл или вставьте текст лекции.</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <div className="text-green-500 mb-2 text-2xl"><i className="fas fa-cogs"></i></div>
-                <h4 className="font-semibold mb-1">2. Обработка</h4>
-                <p className="text-gray-600 text-sm">Алгоритм сгенерирует контрольные вопросы.</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <div className="text-green-500 mb-2 text-2xl"><i className="fas fa-file-download"></i></div>
-                <h4 className="font-semibold mb-1">3. Результат</h4>
-                <p className="text-gray-600 text-sm">Сохраните или скопируйте полученные вопросы.</p>
-              </div>
+      <div className="min-h-screen bg-gradient-to-br from-green-100 via-lime-50 to-white pt-10 text-sm">
+        <div className="max-w-6xl mx-auto px-4 pb-20 relative">
+          <div className="flex justify-between items-center mb-6">
+          <div className="text-2xl font-extrabold text-green-700 flex items-center gap-3">
+              <i className="fas fa-graduation-cap text-green-600 text-3xl"></i>
+              <span className="tracking-tight">SmartLectures</span>
             </div>
+            <button
+              onClick={() => navigate("/")}
+              className="text-sm font-medium text-green-600 hover:text-white bg-white/50 hover:bg-green-500 border border-green-100 rounded-xl px-4 py-1.5 shadow backdrop-blur-sm transition"
+            >
+              <i className="fas fa-arrow-left text-green-500"></i>
+              На главную
+          </button>
           </div>
 
-          <div className="bg-white p-8 rounded-xl shadow-md max-w-6xl mx-auto mb-16">
-                        {stage === "loading" && (
+          <div className="bg-white/80 backdrop-blur-md p-8 rounded-3xl shadow-2xl border border-white">
+            <h1 className="text-3xl font-bold text-gray-800 mb-2 text-center">
+              Генерация контрольных вопросов
+            </h1>
+            <p className="text-gray-600 text-center mb-8">
+              Загрузите текст лекции или файл, и получите вопросы автоматически
+            </p>
+
+            <div className="grid md:grid-cols-3 gap-6 mb-8">
+              <div className="bg-white p-4 rounded-lg border border-green-100 text-center">
+                <i className="fas fa-upload text-green-500 text-2xl mb-2"></i>
+                <h4 className="font-semibold">Вставьте текст</h4>
+                <p className="text-gray-500 text-sm">Загрузите файл или вставьте текст</p>
+              </div>
+              <div className="bg-white p-4 rounded-lg border border-green-100 text-center">
+                <i className="fas fa-cogs text-green-500 text-2xl mb-2"></i>
+                <h4 className="font-semibold">Обработка</h4>
+                <p className="text-gray-500 text-sm">Алгоритм сформирует вопросы</p>
+              </div>
+              <div className="bg-white p-4 rounded-lg border border-green-100 text-center">
+                <i className="fas fa-check text-green-500 text-2xl mb-2"></i>
+                <h4 className="font-semibold">Результат</h4>
+                <p className="text-gray-500 text-sm">Сохраните или скопируйте вопросы</p>
+              </div>
+            </div>
+
+            {stage === "loading" && (
               <div className="bg-white rounded-xl shadow-lg p-8 mb-8 text-center">
                 <i className="fas fa-cog fa-spin text-4xl text-green-600 mb-4"></i>
                 <h2 className="text-2xl font-semibold text-gray-800 mb-2">Генерация вопросов</h2>
                 <p className="text-gray-500 mb-4">Это может занять несколько секунд...</p>
                 <div className="w-full max-w-md mx-auto bg-gray-200 rounded-full h-2.5">
-                  <div
-                    className="bg-green-500 h-2.5 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${progress}%` }}
-                  ></div>
+                  <div className="bg-green-500 h-2.5 rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%` }}></div>
                 </div>
               </div>
             )}
 
-            <div className="flex flex-col md:flex-row gap-6 mb-6">
-              <div className="flex-1">
+            <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div>
                 <input
                   type="text"
                   value={title}
@@ -160,14 +163,14 @@ const QuestionsPage = () => {
                 <textarea
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  className="w-full h-48 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  className="w-full h-40 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                   placeholder="Вставьте текст лекции здесь..."
                 />
               </div>
 
               <div
                 ref={dropRef}
-                className="flex-1 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-green-400 transition-colors"
+                className="border-2 border-dashed border-green-300 rounded-xl p-6 text-center cursor-pointer hover:border-green-500 transition-colors"
                 onClick={() => fileInputRef.current?.click()}
               >
                 {file ? (
@@ -191,55 +194,83 @@ const QuestionsPage = () => {
                 />
               </div>
             </div>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6 mt-6">
+              {/* Кол-во вопросов */}
+              <div className="flex items-center gap-3">
+                <label className="text-gray-700 font-semibold text-sm whitespace-nowrap">
+                  Количество вопросов:
+                </label>
 
+                <div className="flex items-center bg-white border border-gray-300 rounded-full shadow-sm overflow-hidden">
+                  <button
+                    onClick={() => setQuestionCount((prev) => Math.max(1, prev - 1))}
+                    className="px-4 py-2 text-lg font-bold text-gray-600 hover:bg-gray-100 transition"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={questionCount}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      if (val >= 1 && val <= 20) setQuestionCount(val);
+                    }}
+                    className="w-14 text-center font-medium text-gray-800 border-x border-gray-200 outline-none"
+                  />
+                  <button
+                    onClick={() => setQuestionCount((prev) => Math.min(20, prev + 1))}
+                    className="px-4 py-2 text-lg font-bold text-gray-600 hover:bg-gray-100 transition"
+                  >
+                    +
+                  </button>
+                </div>
 
-            <div className="flex flex-col items-center gap-4">
-              <label className="text-gray-700 font-medium mb-1 text-center">Количество вопросов:</label>
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={questionCount}
-                onChange={(e) => setQuestionCount(Number(e.target.value))}
-                className="w-full max-w-xs border border-gray-300 rounded px-4 py-2 text-center focus:ring-2 focus:ring-green-500"
-              />
+                <span className="text-xs text-gray-400">от 1 до 20</span>
+              </div>
+
+              {/* Кнопка */}
               <button
                 onClick={handleGenerate}
-                className="bg-gradient-to-r from-green-400 to-green-600 text-white font-semibold py-3 px-10 rounded-lg shadow-md hover:opacity-90 transition w-full max-w-xs"
+                className="ml-auto md:mr-[12%] bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-xl shadow-md transition flex items-center gap-2"
               >
-                <i className="fas fa-pen mr-2"></i>Сгенерировать вопросы
+                <i className="fas fa-edit"></i>
+                Сгенерировать вопросы
               </button>
             </div>
-          </div>
 
-          {stage === "results" && (
-            <div className="bg-white rounded-xl shadow-lg p-8 mb-16">
-              <div className="text-center mb-8">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4 mx-auto">
-                  <i className="fas fa-check-circle text-3xl text-green-600"></i>
-                </div>
-                <h2 className="text-2xl font-semibold text-gray-800 mb-2">Вопросы готовы!</h2>
-                <p className="text-gray-500">Вот что мы подготовили на основе ваших материалов</p>
-              </div>
-              <div className="space-y-6">
-                {questions.map((q, i) => (
-                  <div key={i} className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                    <p className="text-gray-800 text-lg">
-                      {i + 1}. {typeof q === "object" && q.question_text ? q.question_text : "Вопрос не найден."}
-                    </p>
+            {stage === "results" && (
+              <div className="bg-white rounded-xl shadow-lg p-8 mt-6">
+                <div className="text-center mb-8">
+                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+                    <i className="fas fa-check-circle text-3xl text-green-600"></i>
                   </div>
-                ))}
+                  <h2 className="text-2xl font-semibold text-gray-800 mb-2">Вопросы готовы!</h2>
+                  <p className="text-gray-500">Вот что мы подготовили на основе ваших материалов</p>
+                </div>
+                <div className="space-y-6">
+                  {questions.map((q, i) => (
+                    <div key={i} className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                      <p className="text-gray-800 text-lg">
+                        {i + 1}. {typeof q === "object" && q.question_text ? q.question_text : "Вопрос не найден."}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-8 flex justify-center gap-4">
+                  <button
+                    onClick={handleNew}
+                    className="bg-green-100 hover:bg-green-200 text-green-800 font-medium py-2 px-6 rounded-lg"
+                  >
+                    <i className="fas fa-redo mr-2"></i> Новый файл
+                  </button>
+                </div>
               </div>
-              <div className="mt-8 flex justify-center gap-4">
-                <button
-                  onClick={handleNew}
-                  className="bg-green-100 hover:bg-green-200 text-green-800 font-medium py-2 px-6 rounded-lg"
-                >
-                  <i className="fas fa-redo mr-2"></i> Новый файл
-                </button>
-              </div>
-            </div>
-          )}
+            )}
+
+            <div className="pt-12"></div>
+          </div>
         </div>
       </div>
     </AnimatedPage>
