@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import AnimatedPage from "../pages/AnimatedPage";
 import { authFetch } from "../utils/authFetch";
+import pdfMake from "../utils/pdfInit";
 
 const LecturePage = () => {
   const [title, setTitle] = useState("");
@@ -14,8 +15,7 @@ const LecturePage = () => {
   const [file, setFile] = useState(null);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
-  const [outputFormat, setOutputFormat] = useState("bullet"); // bullet | paragraph
-
+  const [outputFormat, setOutputFormat] = useState("bullet");
 
   useEffect(() => {
     const token = localStorage.getItem("access");
@@ -23,8 +23,7 @@ const LecturePage = () => {
   }, []);
 
   const getNoun = (number, one, two, five) => {
-    let n = Math.abs(number);
-    n %= 100;
+    let n = Math.abs(number) % 100;
     if (n >= 5 && n <= 20) return five;
     n %= 10;
     if (n === 1) return one;
@@ -32,47 +31,68 @@ const LecturePage = () => {
     return five;
   };
 
- const formatSummary = (text) => {
-  if (!text) return <p className="text-gray-500 italic">Здесь появится ваш конспект</p>;
+  const handleDownloadPDF = () => {
+    const content = Array.isArray(summary)
+      ? summary.join("\n• ")
+      : summary;
 
-  if (outputFormat === "bullet") {
-    const lines = Array.isArray(text)
-      ? text
-      : text.split(/\n|•/).map((line) => line.trim()).filter(Boolean);
+    const docDefinition = {
+      content: [
+        { text: `Конспект: ${title || "Без названия"}`, style: "header" },
+        { text: content, style: "body", margin: [0, 10, 0, 0] }
+      ],
+      defaultStyle: {
+        font: "Roboto"
+      },
+      styles: {
+        header: {
+          fontSize: 18,
+          bold: true
+        },
+        body: {
+          fontSize: 12
+        }
+      }
+    };
+
+    pdfMake.createPdf(docDefinition).download(`${title || "lecture"}.pdf`);
+  };
+
+  const formatSummary = (text) => {
+    if (!text) return <p className="text-gray-500 italic">Здесь появится ваш конспект</p>;
+    if (outputFormat === "bullet") {
+      const lines = Array.isArray(text)
+        ? text
+        : text.split(/\n|•/).map((line) => line.trim()).filter(Boolean);
+      return (
+        <ul className="list-disc pl-6 space-y-2 text-left text-gray-800 leading-relaxed">
+          {lines.map((line, i) => (
+            <li key={i}>{line.replace(/^•\s?/, "")}</li>
+          ))}
+        </ul>
+      );
+    }
+    const paragraph = Array.isArray(text) ? text.join("\n\n") : text;
     return (
-      <ul className="list-disc pl-6 space-y-2 text-left text-gray-800 leading-relaxed">
-        {lines.map((line, i) => (
-          <li key={i}>{line.replace(/^•\s?/, "")}</li>
-        ))}
-      </ul>
+      <div className="whitespace-pre-line text-gray-800 leading-relaxed text-justify">
+        {paragraph}
+      </div>
     );
-  }
-
-  // Абзацами
-  const paragraph = Array.isArray(text) ? text.join("\n\n") : text;
-  return (
-    <div className="whitespace-pre-line text-gray-800 leading-relaxed text-justify">
-      {paragraph}
-    </div>
-  );
-};
+  };
 
   const handleSummarize = async () => {
     if (!text.trim()) {
       alert("Пожалуйста, введите текст для конспектирования");
       return;
     }
-
     setIsLoading(true);
     setSummary("");
-
     try {
       const res = await authFetch("http://127.0.0.1:8000/api/summarize-gpt/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, text, level: compression }),
       });
-
       const data = await res.json();
       if (res.ok) {
         setSummary(data.summary_text);
@@ -89,15 +109,6 @@ const LecturePage = () => {
     }
   };
 
-  const handleClear = () => {
-    setText("");
-    setTitle("");
-    setFile(null);
-    setSummary("");
-    setCharCount(0);
-    setSummaryCharCount(0);
-  };
-
   const handleCopy = () => {
     const copyText = Array.isArray(summary) ? summary.join("\n") : summary;
     if (!copyText.trim()) {
@@ -110,35 +121,61 @@ const LecturePage = () => {
   };
 
   const handleSaveLecture = async () => {
-    if (!title.trim() || !text.trim() || !summary.trim()) {
-      alert("Заполните все поля и сгенерируйте конспект перед сохранением");
-      return;
+  if (!title.trim() || !text.trim() || !summary || summary.length === 0) {
+    alert("Заполните все поля и сгенерируйте конспект перед сохранением");
+    return;
+  }
+
+  const summaryText = Array.isArray(summary) ? summary.join("\n") : summary;
+
+  try {
+    const res = await authFetch("http://127.0.0.1:8000/api/save_lecture/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: title.trim(),
+        text: text.trim(),
+        summary: summaryText.trim(),
+        format: outputFormat === "bullet" ? "тезисы" : "абзацы"
+      }),
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      alert("Лекция успешно сохранена");
+    } else {
+      alert(data.error || "Ошибка при сохранении лекции");
     }
+  } catch (err) {
+    alert("Сервер не отвечает");
+    console.error(err);
+  }
+};
 
+  const onFileChange = async (e) => {
+    const selectedFile = e.target.files[0];
+    if (!selectedFile) return;
+    setFile(selectedFile);
+    const formData = new FormData();
+    formData.append("file", selectedFile);
     try {
-      const res = await authFetch("http://127.0.0.1:8000/api/save_lecture/", {
+      const res = await fetch("http://127.0.0.1:8000/api/upload_pdf/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          text,
-          summary,
-          format: "тезисы"
-        }),
+        body: formData,
       });
-
       const data = await res.json();
       if (res.ok) {
-        alert("Лекция успешно сохранена");
+        setText(data.text);
+        setCharCount(data.text.length);
       } else {
-        alert(data.error || "Ошибка при сохранении лекции");
+        alert(data.error || "Ошибка при извлечении текста");
       }
-    } catch {
-      alert("Сервер не отвечает");
+    } catch (err) {
+      alert("Не удалось загрузить PDF");
     }
   };
 
- return (
+  return (
   <AnimatedPage>
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-blue-100 to-white pt-10 text-sm">
       <div className="max-w-6xl mx-auto px-4 pb-20 relative">
@@ -147,9 +184,14 @@ const LecturePage = () => {
               <i className="fas fa-graduation-cap text-blue-600 text-3xl"></i>
               <span className="tracking-tight">SmartLectures</span>
             </div>
-
-          что
-        </div>
+            <button
+              onClick={() => navigate("/")}
+              className="text-sm font-medium text-blue-600 hover:text-white bg-white/50 hover:bg-blue-500 border border-blue-100 rounded-xl px-4 py-1.5 shadow backdrop-blur-sm transition"
+            >
+              <i className="fas fa-arrow-left text-blue-500"></i>
+              На главную
+          </button>
+          </div>
         
         <div className="bg-white/80 backdrop-blur-md p-8 rounded-3xl shadow-2xl border border-white">
           <h1 className="text-3xl font-bold text-gray-800 mb-2 text-center">
@@ -158,6 +200,19 @@ const LecturePage = () => {
           <p className="text-gray-600 text-center mb-8">
             Вставьте текст лекции или загрузите файл – и получите краткий конспект
           </p>
+            <div className="mb-6">
+              <label className="block text-gray-700 font-semibold mb-2" htmlFor="title">
+                Название лекции
+              </label>
+              <input
+                id="title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                placeholder="Введите название лекции"
+              />
+            </div>
 
           <div className="grid md:grid-cols-3 gap-6 mb-8">
             <div className="bg-white p-4 rounded-lg border border-blue-100 text-center">
@@ -199,7 +254,6 @@ const LecturePage = () => {
             </div>
 
             <div
-              ref={fileInputRef}
               className="flex flex-col justify-center items-center border-2 border-dashed border-blue-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-500 transition-colors min-h-[240px]"
               onClick={() => fileInputRef.current?.click()}
             >
@@ -213,13 +267,15 @@ const LecturePage = () => {
                 <>
                   <i className="fas fa-cloud-upload-alt text-4xl text-blue-500 mb-3"></i>
                   <p className="text-gray-600 mb-2">Перетащите файл или нажмите для загрузки</p>
-                  <p className="text-sm text-gray-400">PDF, DOCX, TXT, макс. 10MB</p>
+                  <p className="text-sm text-gray-400">PDF, макс. 10MB</p>
                 </>
               )}
               <input
                 type="file"
+                accept="application/pdf"
                 className="hidden"
-                onChange={(e) => setFile(e.target.files[0])}
+                ref={fileInputRef}
+                onChange={onFileChange}
               />
             </div>
           </div>
@@ -305,6 +361,12 @@ const LecturePage = () => {
               >
                 <i className="fas fa-save mr-2"></i>Сохранить
               </button>
+              <button
+              onClick={handleDownloadPDF}
+              className="px-5 py-2.5 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition"
+            >
+              <i className="fas fa-file-download mr-2"></i>Скачать PDF
+            </button>
             </div>
           </div>
         </div>

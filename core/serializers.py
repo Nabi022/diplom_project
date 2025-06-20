@@ -9,12 +9,11 @@ class SummarySerializer(serializers.ModelSerializer):
 
 
 class LectureSerializer(serializers.ModelSerializer):
-    # Вложенные сокращения — если хочешь отображать их вместе
-    summaries = SummarySerializer(many=True, read_only=True)
+    summaries = SummarySerializer(source='summary_set', many=True, read_only=True)
 
     class Meta:
         model = Lecture
-        fields = '__all__'
+        fields = ['id', 'user', 'title', 'content', 'summaries', 'created_at']
 
 
 class QuestionSerializer(serializers.ModelSerializer):

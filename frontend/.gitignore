@@ -10,7 +10,14 @@ db.sqlite3
 
 # Django media & static
 /media/
+media/avatars/
+media/uploads/
+media/*.pdf
 /staticfiles/
+
+# Миграции (если нужно игнорировать)
+*/migrations/*.py
+!*/migrations/__init__.py
 
 # Environment
 .env
@@ -41,10 +48,18 @@ lerna-debug.log*
 *.sln
 *.sw?
 
-# Optional: file translations
-*.pot
-*.mo
+# Model files (optional for AI/ML)
+*.pkl
+*.pt
+*.onnx
+*.h5
 
-# Optional: skip migration files
-# */migrations/*.py
-# !*/migrations/__init__.py
+# Office & doc artifacts
+*.pdf
+*.docx
+*.xlsx
+
+# System
+Thumbs.db
+ehthumbs.db
+Desktop.ini

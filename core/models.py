@@ -30,6 +30,7 @@ class Lecture(models.Model):
     title = models.CharField(max_length=255)
     content = models.TextField()
     summary = models.TextField(blank=True)
+    format = models.CharField(max_length=50, default='текст') 
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -54,8 +55,10 @@ class Quiz(models.Model):
         return self.question_text
     
 class Summary(models.Model):
-    title = models.CharField(max_length=255, default='Без названия')  # 👈 добавлено
-    text = models.TextField()
+    lecture = models.ForeignKey(Lecture, on_delete=models.CASCADE, related_name="summary_set") 
+    title = models.CharField(max_length=255, default='Без названия')
+    summary_text = models.TextField()
+    format = models.CharField(max_length=50, default='тезисы')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

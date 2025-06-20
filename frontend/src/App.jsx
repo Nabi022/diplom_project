@@ -11,6 +11,7 @@ import QuizPage from "./pages/QuizPage";
 import TestPage from "./pages/TestPage";
 import ProfilePage from "./pages/ProfilePage";
 import AboutPage from "./pages/AboutPage";
+import LectureViewPage from "./pages/LectureViewPage";
 
 function App() {
   useEffect(() => {
@@ -31,6 +32,7 @@ function App() {
         <Route path="/test" element={<TestPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/lecture/:id" element={<LectureViewPage />} />
       </Routes>
     </Router>
   );
