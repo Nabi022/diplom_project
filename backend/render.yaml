@@ -14,5 +14,7 @@ services:
       - key: ALLOWED_HOSTS
         value: smartlectures-backend.onrender.com
       - key: SECRET_KEY
-        value: your-secret-key  # обязательно замени!
+        value: dj_8!7gb1@fakesecret_random # заменишь на свой
+      - key: OPENAI_API_KEY
+        value: sk-... # сюда — реальный ключ OpenAI
     autoDeploy: true
