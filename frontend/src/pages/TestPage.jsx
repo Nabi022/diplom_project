@@ -68,33 +68,34 @@ const TestPage = () => {
   };
 
   const handleGenerate = async () => {
-    if (!text.trim()) {
-      alert("Введите или загрузите текст лекции");
-      return;
-    }
+  if (!text.trim()) {
+    alert("Введите или загрузите текст лекции");
+    return;
+  }
 
-    setStage("loading");
-    setProgress(30);
+ 
+  setStage("loading");
+  setProgress(30);
 
-    try {
-      const res = await authFetch("http://127.0.0.1:8000/api/generate-quiz-gpt/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, count }),
-      });
+  try {
+    const res = await authFetch("http://127.0.0.1:8000/api/generate-quiz-gpt/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, count }),
+    });
 
-      if (!res.ok) throw new Error("Ошибка при генерации теста");
+    if (!res.ok) throw new Error("Ошибка при генерации теста");
 
-      const quizData = await res.json();
-      setQuiz(quizData);
-      setProgress(100);
-      setTimeout(() => setStage("results"), 300);
-    } catch (error) {
-      console.error("Ошибка:", error);
-      alert("Ошибка при генерации теста");
-      setStage("upload");
-    }
-  };
+    const quizData = await res.json();
+    setQuiz(quizData);
+    setProgress(100);
+    setTimeout(() => setStage("results"), 300);
+  } catch (error) {
+    console.error("Ошибка:", error);
+    alert("Ошибка при генерации теста");
+    setStage("upload");
+  }
+};
 
   const handleNew = () => {
     setFile(null);
@@ -378,26 +379,30 @@ const QuestionBlock = ({ question, index, onAnswer }) => {
     }
   };
 
- return (
-    <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-      <h3 className="text-lg font-medium text-gray-800 mb-4">
+  return (
+    <div className="bg-white/70 backdrop-blur-md rounded-2xl shadow-md border border-purple-100 p-6">
+      <h3 className="text-lg font-semibold text-gray-800 mb-5">
         {index + 1}. {question.question_text}
       </h3>
-      <ul className="space-y-2">
+
+      <ul className="space-y-3">
         {question.options.map((opt, i) => {
           const isCorrect = i === question.correct_index;
           const isSelected = i === selected;
 
-          let className = "block w-full text-left px-4 py-2 rounded-lg border transition";
+          let base = "w-full px-5 py-3 rounded-xl text-sm font-medium border transition-all duration-300 text-left";
+          let className = base;
 
-          if (selected != null) {
-            className += isCorrect
-              ? " border-green-500 bg-green-100 text-green-700 font-semibold"
-              : isSelected
-              ? " border-red-500 bg-red-100 text-red-700"
-              : " border-gray-200 bg-white";
+          if (selected !== null) {
+            if (isCorrect) {
+              className += " bg-green-100 border-green-400 text-green-800";
+            } else if (isSelected) {
+              className += " bg-red-100 border-red-400 text-red-800";
+            } else {
+              className += " bg-gray-50 border-gray-200 text-gray-700";
+            }
           } else {
-            className += " border-gray-200 bg-white hover:bg-purple-50";
+            className += " bg-white border-gray-300 text-gray-800 hover:bg-purple-50 hover:scale-[1.01]";
           }
 
           return (
@@ -413,17 +418,23 @@ const QuestionBlock = ({ question, index, onAnswer }) => {
           );
         })}
       </ul>
-      {selected != null && (
-        <p className="mt-3 font-medium">
+
+      {selected !== null && (
+        <div className="mt-4 text-sm font-semibold">
           {selected === question.correct_index ? (
-            <span className="text-green-600">✅ Верно</span>
+            <span className="text-green-600 flex items-center gap-2">
+              <i className="fas fa-check-circle"></i> Верно
+            </span>
           ) : (
-            <span className="text-red-600">❌ Неверно</span>
+            <span className="text-red-600 flex items-center gap-2">
+              <i className="fas fa-times-circle"></i> Неверно
+            </span>
           )}
-        </p>
+        </div>
       )}
     </div>
   );
 };
+
 
 export default TestPage;

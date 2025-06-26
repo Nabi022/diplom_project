@@ -27,29 +27,53 @@ const LectureViewPage = () => {
   }, [id]);
 
   const handleDownloadPDF = () => {
-    if (!lecture) {
-      alert("Лекция не загружена");
-      return;
+  if (!lecture) {
+    alert("Лекция не загружена");
+    return;
+  }
+
+  const isQuiz = lecture.format === "тест";
+  let resultContent = "Нет результата генерации";
+
+  if (isQuiz) {
+    try {
+      const quiz = JSON.parse(lecture.summary);
+      resultContent = quiz
+        .map((q, i) => {
+          const optionsText = q.options
+            .map((opt, idx) => {
+              const mark = idx === q.correct_index ? "✅" : "•";
+              return `${mark} ${opt}`;
+            })
+            .join("\n");
+          return `${i + 1}. ${q.question_text}\n${optionsText}`;
+        })
+        .join("\n\n");
+    } catch (e) {
+      resultContent = "Ошибка при разборе теста";
     }
+  } else {
+    resultContent = lecture.summary || "Нет результата генерации";
+  }
 
-    const docDefinition = {
-      content: [
-        { text: `Лекция: ${lecture.title || "Без названия"}`, style: "header" },
-        { text: "Исходный текст", style: "subheader", margin: [0, 10, 0, 5] },
-        { text: lecture.text || "Нет исходного текста", style: "body" },
-        { text: "Результат генерации", style: "subheader", margin: [0, 10, 0, 5] },
-        { text: lecture.summary || "Нет результата генерации", style: "body" },
-      ],
-      defaultStyle: { font: "Roboto" },
-      styles: {
-        header: { fontSize: 18, bold: true },
-        subheader: { fontSize: 14, bold: true },
-        body: { fontSize: 12 },
-      },
-    };
-
-    pdfMake.createPdf(docDefinition).download(`${lecture.title || "lecture"}.pdf`);
+  const docDefinition = {
+    content: [
+      { text: `Лекция: ${lecture.title || "Без названия"}`, style: "header" },
+      { text: "Исходный текст", style: "subheader", margin: [0, 10, 0, 5] },
+      { text: lecture.text || "Нет исходного текста", style: "body" },
+      { text: "Результат генерации", style: "subheader", margin: [0, 10, 0, 5] },
+      { text: resultContent, style: "body" },
+    ],
+    defaultStyle: { font: "Roboto" },
+    styles: {
+      header: { fontSize: 18, bold: true },
+      subheader: { fontSize: 14, bold: true },
+      body: { fontSize: 12 },
+    },
   };
+
+  pdfMake.createPdf(docDefinition).download(`${lecture.title || "lecture"}.pdf`);
+};
 
   if (!lecture) {
     return (

@@ -78,7 +78,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 def ask_gpt(prompt, max_tokens=1500):
     try:
         response = client.chat.completions.create(
-            model="gpt-4",  # временно используем GPT-4
+            model="gpt-3.5-turbo",  # временно используем GPT-4
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=max_tokens,
@@ -167,10 +167,16 @@ def generate_quiz_gpt(request):
 
     prompt = (
         f"Сгенерируй {count} тестовых вопросов по следующему тексту. "
-        f"У каждого вопроса должно быть ровно 4 варианта ответа. "
-        f"Правильный вариант оберни в двойные звёздочки (пример: **правильный**). "
-        f"Формат:\n"
-        f"Вопрос?\nA) вариант\nB) **правильный**\nC) вариант\nD) вариант\n\n"
+        f"У каждого вопроса должно быть ровно 4 варианта ответа, обозначенных буквами A), B), C), D). "
+        f"Правильный вариант **всегда** должен быть обёрнут в двойные звёздочки (пример: A) **Правильный вариант**). "
+        f"Формат строго как в примере ниже.\n\n"
+        f"Пример:\n"
+        f"Какой цвет не относится к основным?\n"
+        f"A) Синий\n"
+        f"B) Красный\n"
+        f"C) **Зелёный**\n"
+        f"D) Жёлтый\n\n"
+        f"Теперь сгенерируй {count} вопроса:\n\n"
         f"Текст:\n{text}"
     )
 
@@ -184,7 +190,7 @@ def generate_quiz_gpt(request):
             if len(lines) < 5:
                 continue
 
-            question_line = re.sub(r"^\d+[\.\)]\s*", "", lines[0].strip())  # удаляем ручную нумерацию
+            question_line = re.sub(r"^\d+[\.\)]\s*", "", lines[0].strip())
             option_lines = lines[1:5]
             options = []
             correct_index = None
@@ -193,13 +199,14 @@ def generate_quiz_gpt(request):
                 match = re.match(r"[A-Da-d]\)\s*(.*)", line)
                 option_raw = match.group(1).strip() if match else line.strip()
 
-                if "**" in option_raw and correct_index is None:
+                if re.search(r"\*\*(.+?)\*\*", option_raw) and correct_index is None:
                     correct_index = i
+
                 clean_option = re.sub(r"\*\*(.*?)\*\*", r"\1", option_raw)
                 options.append(clean_option)
 
             if correct_index is None:
-                correct_index = 0  # fallback — если модель не выделила
+                correct_index = 0  # fallback
 
             quiz.append({
                 "question_text": question_line,
@@ -210,6 +217,7 @@ def generate_quiz_gpt(request):
         return Response(quiz, status=200)
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+
 
 
 @api_view(["POST"])
