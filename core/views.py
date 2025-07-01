@@ -2,7 +2,6 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-import torch
 import random
 import re
 import os
@@ -18,7 +17,6 @@ from django.views.decorators.csrf import csrf_exempt
 from .serializers import UserSerializer
 
 load_dotenv()
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 User = get_user_model()
 
 
