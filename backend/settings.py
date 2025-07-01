@@ -66,16 +66,13 @@ TEMPLATES = [
 WSGI_APPLICATION = 'backend.wsgi.application'
 
 # 🗄️ Настройки базы данных — через переменные окружения
+import os
+import dj_database_url
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'diplom_db',
-        'USER': 'nabi',
-        'PASSWORD': '19112002',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
+    'default': dj_database_url.config(default=os.getenv("DATABASE_URL"))
 }
+
 
 # 🛡️ Валидация паролей
 AUTH_PASSWORD_VALIDATORS = [
@@ -121,6 +118,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://your-app-name.onrender.com",  
 ]
 
 # 🔑 OpenAI API‑ключ

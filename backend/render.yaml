@@ -14,7 +14,9 @@ services:
       - key: ALLOWED_HOSTS
         value: smartlectures-backend.onrender.com
       - key: SECRET_KEY
-        value: dj_8!7gb1@fakesecret_random # заменишь на свой
+        value: pVbMEvA8A2zp04M6T8ED6bB4cuRAYRk0WgKFtK72MyzLuME0bH
       - key: OPENAI_API_KEY
-        value: sk-... # сюда — реальный ключ OpenAI
+        value: sk-...                        # ⚠️ твой OpenAI API ключ
+      - key: DATABASE_URL
+        value: postgres://...               # ⚠️ Render сгенерирует URL после создания БД
     autoDeploy: true
