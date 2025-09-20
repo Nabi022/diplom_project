@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@rollup/plugin-commonjs": "^28.0.6",
     "react-icons": "^5.5.0"
   }
 }

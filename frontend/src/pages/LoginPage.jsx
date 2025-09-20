@@ -8,28 +8,30 @@ const LoginPage = () => {
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    try {
-      const response = await fetch("http://localhost:8000/api/token/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
+  try {
+    const response = await fetch("http://127.0.0.1:8000/api/token/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
 
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem("access", data.access);
-        localStorage.setItem("refresh", data.refresh);
-        localStorage.setItem("username", username);
-        navigate("/");
-      } else {
-        setError("Неверное имя пользователя или пароль");
-      }
-    } catch {
-      setError("Ошибка подключения к серверу");
+    const data = await response.json();
+
+    if (response.ok) {
+      localStorage.setItem("access", data.access);
+      localStorage.setItem("refresh", data.refresh);
+      localStorage.setItem("username", username);
+      navigate("/");
+    } else {
+      setError(data.detail || "Неверное имя пользователя или пароль");
     }
-  };
+  } catch {
+    setError("Ошибка подключения к серверу");
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">

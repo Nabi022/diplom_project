@@ -1,0 +1,41 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: smartlectures-backend
+    command: gunicorn backend.wsgi:application --bind 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    container_name: smartlectures-frontend
+    # Если нужен live-редакт, раскомментируй две строки ниже:
+    # volumes:
+    #   - ./frontend:/app
+    #   - /app/node_modules
+    ports:
+      - "5173:5173"
+    env_file:
+      - ./backend/.env
+
+  db:
+    image: postgres:15
+    container_name: smartlectures-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

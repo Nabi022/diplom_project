@@ -15,10 +15,6 @@ media/uploads/
 media/*.pdf
 /staticfiles/
 
-# Миграции (если нужно игнорировать)
-*/migrations/*.py
-!*/migrations/__init__.py
-
 # Environment
 .env
 

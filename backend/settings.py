@@ -17,20 +17,24 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "unsafe-default-key")
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 ALLOWED_HOSTS = ['*']
 
-# 🧩 Приложения
 INSTALLED_APPS = [
+    # django
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    # third-party
     'rest_framework',
-    'core',
+    'rest_framework_simplejwt',   # ✅ добавь это
     'corsheaders',
+
+    # local
+    'backend.core.apps.CoreConfig',
 ]
 
-# — и так далее до конца файла
 
 
 MIDDLEWARE = [
